@@ -11,7 +11,7 @@ class RNN(nn.Module):
         self.hidden_size = hidden_size
         # self.emb_size = emb_size
 
-        # self.i2e = nn.Linear(input_size, emb_size)  # Embedding layer
+        # self.i2e = nn.Linear(input_size, emb_size)  # Embedding layer = 6
         self.i2h = nn.Linear(input_size + hidden_size, hidden_size)
         self.i2o = nn.Linear(input_size + hidden_size, output_size)
         self.softmax = nn.LogSoftmax(dim=1)
@@ -38,9 +38,9 @@ class RNN(nn.Module):
         for i in range(line_tensor.size()[0]):
             output, hidden = self(line_tensor[i], hidden)
 
-        # Compare final output to target 
+        # Compare final output to target
         loss = self.criterion(output, emotion_tensor)
-        
+
         # Back-propagate
         loss.backward()
 
@@ -48,5 +48,5 @@ class RNN(nn.Module):
         for p in self.parameters():
             p.data.add_(p.grad.data, alpha=-self.learning_rate)
 
-        # Return the ouptut and loss 
+        # Return the ouptut and loss
         return output, loss.item()
