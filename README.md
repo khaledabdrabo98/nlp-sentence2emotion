@@ -6,8 +6,8 @@ python main.py
 ```
 
 ## Dépendances
-- Python
-- TorchText : `pip install torchtext` 
+- Python3
+- TorchText : `pip3 install torchtext` 
 
 ## Travail de 
 - Jean BRIGNONE p1709655
