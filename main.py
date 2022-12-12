@@ -10,8 +10,6 @@ from RNN import RNN
 from CustomDataset import CustomTextDataset
 from utils import lineToTensor
 
-MIN_WORD_FREQUENCY = 50
-FIXED_SENTENCE_LENGTH = 300
 
 def timeSince(since):
     now = time.time()
@@ -53,7 +51,6 @@ def emotion_from_output(output, emotions):
 
 
 def main():
-    
     # TODO
     # Stock mot-id in DataLoader
     # Get OneHot encoding each time you process a word in the loop
@@ -71,11 +68,11 @@ def main():
     test_sentences, test_emotions = load_file(test_filepath)
     val_sentences, val_emotions = load_file(val_filepath)
 
-    # TODO : Load data
+    # Load data
 
-    # get vocab
-    train_vocab = get_vocab_from_sentences(train_sentences)    
-    train_dataset = CustomTextDataset(train_vocab, train_sentences, train_emotions)
+    # Get vocab from sentences 
+    train_vocab = get_vocab_from_sentences(train_sentences)  
+    train_dataset = CustomTextDataset(train_vocab, train_sentences, train_emotions) 
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     # val_loader = DataLoader(val_onehot, batch_size=1, shuffle=False)
@@ -115,7 +112,7 @@ def main():
     # TODO : Train RNN
     n_hidden = 128 
     rnn = RNN(len(train_dataset.vocab), n_hidden, n_hidden, n_emotions)
-
+    
     print_every = 5000
     plot_every = 1000
     
@@ -123,33 +120,33 @@ def main():
     current_loss = 0
     all_losses = []
 
-    print(len(train_dataset))
-
     start = time.time()
 
     for n in range(n_epochs):
         for word_tensors, emotion_tensor in train_loader:
-            for w_tensor in word_tensors:
-                output, loss = rnn.train(emotion_tensor, w_tensor)
-                print(emotion_tensor)
-                print(w_tensor)
-                current_loss += loss
+            pass
+        
+            # for w_tensor in word_tensors:
+            #     output, loss = rnn.train(emotion_tensor, w_tensor)
+            #     print(emotion_tensor)
+            #     print(w_tensor)
+            #     current_loss += loss
 
-                # # Print iter number, loss, name and guess
-                # if iter % print_every == 0:
-                #     guess, guess_i = emotion_from_output(output)
-                #     correct = '✓' if guess == emotion else '✗ (%s)' % emotion
-                #     print('%d %d%% (%s) %.4f %s / %s %s' % (iter, iter / n_epochs *
-                #         100, timeSince(start), loss, sentence, guess, correct))
+            #     # # Print iter number, loss, name and guess
+            #     # if iter % print_every == 0:
+            #     #     guess, guess_i = emotion_from_output(output)
+            #     #     correct = '✓' if guess == emotion else '✗ (%s)' % emotion
+            #     #     print('%d %d%% (%s) %.4f %s / %s %s' % (iter, iter / n_epochs *
+            #     #         100, timeSince(start), loss, sentence, guess, correct))
 
-                # Add current loss avg to list of losses
-                if iter % plot_every == 0:
-                    all_losses.append(current_loss / plot_every)
-                    current_loss = 0
+            #     # Add current loss avg to list of losses
+            #     if iter % plot_every == 0:
+            #         all_losses.append(current_loss / plot_every)
+            #         current_loss = 0
 
     # TODO : Plot the results
-    plt.figure()
-    plt.plot(all_losses)
+    # plt.figure()
+    # plt.plot(all_losses)
 
     # TODO : Evaluate the results
 

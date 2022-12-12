@@ -1,6 +1,6 @@
 import torch
 
-MAX_WORDS_PER_TRAINING = 10
+MAX_WORDS_PER_TRAINING = 5
 
 
 # Find letter index from all_letters, e.g. "a" = 0
