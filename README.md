@@ -7,6 +7,7 @@ python3 main.py
 
 ## Dépendances
 - Python3
+- PyTorch : `pip3 install pytorch`
 - TorchText : `pip3 install torchtext` 
 
 ## Travail de 
