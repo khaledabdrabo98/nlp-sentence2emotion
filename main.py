@@ -22,11 +22,11 @@ def main():
     plot_every = 1000
 
     stopwords = ['i', 'a', 'im', 'am', 'me', 'my', 'he', 'him', 'she', 'her', 'it',
-                 'us', 're', 'own', 'isn', 'isnt', 'is', 'are',  'do', 'be', 'go', 'yet'
+                 'us', 're', 'own', 'isn', 'isnt', 'is', 'are', 'do', 'be', 'go', 'yet'
                  'in', 'the', 'to', 'so', 'if', 'and', 'dr', 'for', 'by', 'its', 'but',
                  'm', 'this', 'up', 'yes', 'up', 'all', 'at', 'that', 'out', 'or', 'too',
                  'on', 'ive', 'of', 'as', 'bit',   'jo', 't', 'don', 's', 'oh', 'an', 'q', 
-                 'we', 'they', 'dh', 'n', 'ok', 'okay' 'la']
+                 'we', 'they', 'dh', 'n', 'ok', 'okay', 'la']
 
     train_filepath = "dataset/train.txt"  # 16000 sentences
     val_filepath = "dataset/val.txt"     # 2000 sentences
@@ -57,8 +57,7 @@ def main():
     test_dataset = CustomTextDataset(
         test_samples, test_targets, vocab, labels_vocab, max_sentence_len, onehot=False)
 
-    train_loader = DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
@@ -97,8 +96,6 @@ def main():
             for w in x:
                 output, hidden = rnn(w.type(torch.FloatTensor), hidden)
 
-            acc += torch.argmax(output, 1) == torch.argmax(t, 1)
-
             # Back-propagate
             loss = criterion(t.type(torch.FloatTensor), output)
             loss.backward()
@@ -107,10 +104,6 @@ def main():
 
             optim.step()
             optim.zero_grad()
-
-            # Add parameters' gradients to their values, multiplied by learning rate
-            for p in rnn.parameters():
-                p.data.add_(p.grad.data, alpha=-learning_rate)
 
             # Print iter number, loss, name and guess
             # if iter % print_every == 0:
