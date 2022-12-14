@@ -1,12 +1,13 @@
 import time
 import torch
 import torch.nn as nn
+import numpy as np
 from torch.utils.data import DataLoader
 from torchtext.vocab import build_vocab_from_iterator
 
 from RNN import RNN
 from CustomDataset import CustomTextDataset
-from utils import time_since, load_files, plot_confusion_matrix, plot_perf
+from utils import time_since, load_files, tokenize_dataset, normalize_sample, plot_confusion_matrix, plot_perf
 
 
 def main():
@@ -25,7 +26,7 @@ def main():
                  'us', 're', 'own', 'isn', 'isnt', 'is', 'are', 'do', 'be', 'go', 'yet'
                  'in', 'the', 'to', 'so', 'if', 'and', 'dr', 'for', 'by', 'its', 'but',
                  'm', 'this', 'up', 'yes', 'up', 'all', 'at', 'that', 'out', 'or', 'too',
-                 'on', 'ive', 'of', 'as', 'bit',   'jo', 't', 'don', 's', 'oh', 'an', 'q', 
+                 'on', 'ive', 'of', 'as', 'bit',  'jo', 't', 'don', 's', 'oh', 'an', 'q', 
                  'we', 'they', 'dh', 'n', 'ok', 'okay', 'la']
 
     train_filepath = "dataset/train.txt"  # 16000 sentences
@@ -50,16 +51,28 @@ def main():
     n_emotions = len(labels_vocab)
 
     # Load data
-    train_dataset = CustomTextDataset(
-        train_samples, train_targets, vocab, labels_vocab, max_sentence_len, onehot=True)
-    val_dataset = CustomTextDataset(
-        val_samples, val_targets, vocab, labels_vocab, max_sentence_len, onehot=True)
-    test_dataset = CustomTextDataset(
-        test_samples, test_targets, vocab, labels_vocab, max_sentence_len, onehot=False)
+    train_samples = tokenize_dataset(train_samples, vocab)
+    val_samples = tokenize_dataset(val_samples, vocab)
+    test_samples = tokenize_dataset(test_samples, vocab)
+    
+    train_targets = tokenize_dataset(train_targets, labels_vocab)
+    val_targets = tokenize_dataset(val_targets, labels_vocab)
+    test_targets = tokenize_dataset(test_targets, labels_vocab)
+    
+    train_indices = np.arange(len(train_samples),step=batch_size)
+    val_indices = np.arange(len(val_samples), step=batch_size)
+    test_indices = np.arange(len(test_samples), step=batch_size)
+    
+    # train_dataset = CustomTextDataset(
+    #     train_samples, train_targets, vocab, labels_vocab, max_sentence_len, onehot=True)
+    # val_dataset = CustomTextDataset(
+    #     val_samples, val_targets, vocab, labels_vocab, max_sentence_len, onehot=True)
+    # test_dataset = CustomTextDataset(
+    #     test_samples, test_targets, vocab, labels_vocab, max_sentence_len, onehot=False)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+    # train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    # val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
+    # test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
     # DEBUG Dataset
     # print(len(train_dataset))
@@ -69,7 +82,6 @@ def main():
 
     # train_dataset.__getitem__(2)
 
-    ##### RNN Training #####
     rnn = RNN(len(vocab), n_embedding, n_hidden,
               n_emotions, batch_size, learning_rate)
     optim = torch.optim.SGD(rnn.parameters(), lr=learning_rate)
@@ -84,11 +96,25 @@ def main():
 
     for iter in range(n_epochs):
         start_time = time.time()
-        for x, t in train_loader:
-            # Transpose sentence tensor to change dimension order
-            # from : tensor(batch_size, sentence_length, vocabulary_size)
-            # to : tensor(sentence_length, batch_size, vocabulary_size)
-            x = torch.transpose(x, 0, 1)
+        np.random.shuffle(train_indices)
+        
+        ##### RNN Training #####
+        for i in train_indices:
+            x = train_samples[i:i + batch_size]
+            t = train_targets[i:i + batch_size]
+            
+            # Bringing all samples to max_sentence_len
+            normalize_sample(x, max_sentence_len)
+            
+            # Batch dimensioning
+            x = [list(l) for l in zip(*x)]
+            t = [l for l in zip(*t)]
+            # One-hot encode the batch
+            x = torch.nn.functional.one_hot(torch.LongTensor(x), num_classes=len(vocab))
+            t = torch.nn.functional.one_hot(torch.LongTensor(t).flatten(), num_classes=len(labels_vocab))
+            # print(x.shape)
+            # print(t.shape)
+            
             # Create a zeroed initial hidden state
             hidden = rnn.init_hidden()
 
@@ -126,11 +152,21 @@ def main():
         ##### RNN Validation #####
         # Evaluate the model's results using validation dataset
         acc = 0
-        for x, t in val_loader:
-            # Transpose sentence tensor to change dimension order
-            # from : tensor(batch_size, sentence_length, vocabulary_size)
-            # to : tensor(sentence_length, batch_size, vocabulary_size)
-            x = torch.transpose(x, 0, 1)
+        np.random.shuffle(val_indices)
+        for i in val_indices:
+            x = val_samples[i:i + batch_size]
+            t = val_targets[i:i + batch_size]
+            
+            # Bringing all samples to max_sentence_len
+            normalize_sample(x, max_sentence_len)
+            
+            # Batch dimensioning
+            x = [list(l) for l in zip(*x)]
+            t = [l for l in zip(*t)]
+            # One-hot encode the batch
+            x = torch.nn.functional.one_hot(torch.LongTensor(x), num_classes=len(vocab))
+            t = torch.nn.functional.one_hot(torch.LongTensor(t).flatten(), num_classes=len(labels_vocab))
+            
             # Create a zeroed initial hidden state
             hidden = rnn.init_hidden()
 
@@ -152,12 +188,20 @@ def main():
     for i in range(len(labels_vocab)):
         confusion_matrix.append([0 for _ in range(len(labels_vocab))])
 
-    for x, t in test_loader:
-        t = t[0].tolist()
-        # Transpose sentence tensor to change dimension order
-        # from : tensor(batch_size, sentence_length, vocabulary_size)
-        # to : tensor(sentence_length, batch_size, vocabulary_size)
-        x = torch.transpose(x, 0, 1)
+
+    for t in test_indices:
+        x = test_samples[t:t + batch_size]
+        t = test_targets[t:t + batch_size]
+        
+        # Bringing all samples to max_sentence_len
+        normalize_sample(x, max_sentence_len)
+        
+        # Batch dimensioning
+        x = [list(l) for l in zip(*x)]
+        t = [i for sub in t for i in sub]
+        # One-hot encode the batch
+        x = torch.nn.functional.one_hot(torch.LongTensor(x), num_classes=len(vocab))
+        
         # Create a zeroed initial hidden state
         hidden = rnn.init_hidden()
 

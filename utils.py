@@ -49,6 +49,24 @@ def load_files(files, stopwords):
 
     return samples, targets, vocabulary, labels
 
+# Takes a dataset (a list of sentences) and transform each sentence (which
+# is a list of tokens) into a list of indices according to the global vocabulary
+def tokenize_dataset(dataset, vocab):
+    tokenized = []
+    for w in dataset:
+        tokenized.append(vocab(w))
+    return tokenized
+
+# Bringing all samples to max_len
+def normalize_sample(indexes, max_len):
+    for dt in indexes:
+        if len(dt) < max_len:
+            while len(dt) < max_len:
+                dt.append(0)
+        elif len(dt) > max_len:
+            while len(dt) > max_len:
+                dt.pop()
+
 # Function that displays the confusion matrix 
 def plot_confusion_matrix(matrix):
     ax = sn.heatmap(matrix, annot=False, annot_kws={"size": 16})
