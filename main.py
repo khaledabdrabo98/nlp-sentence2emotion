@@ -11,7 +11,7 @@ from utils import time_since, load_files, tokenize_dataset, normalize_sample, pl
 
 
 def main():
-    batch_size = 10  # amount of data treated each time
+    batch_size = 20  # amount of data treated each time
     n_epochs = 20  # number of time the dataset will be read
     max_sentence_len = 5
     learning_rate = 0.005
@@ -29,7 +29,7 @@ def main():
                  'on', 'ive', 'of', 'as', 'bit',  'jo', 't', 'don', 's', 'oh', 'an', 'q', 
                  'we', 'they', 'dh', 'n', 'ok', 'okay', 'la']
 
-    train_filepath = "dataset/train.txt"  # 16000 sentences
+    train_filepath = "dataset/train.txt" # 16000 sentences
     val_filepath = "dataset/val.txt"     # 2000 sentences
     test_filepath = "dataset/test.txt"   # 2000 sentences
     files = [train_filepath, val_filepath, test_filepath]
@@ -92,7 +92,6 @@ def main():
     current_loss = 0
     all_losses = []
     all_perf = []
-    acc = 0
 
     for iter in range(n_epochs):
         start_time = time.time()
@@ -146,16 +145,15 @@ def main():
             # # # TODO : Plot the results
             # plt.figure()
             # plt.plot(all_losses)
-        print(
-            f"Epoch {iter + 1:2} - Training completed in {time_since(start_time)}.")
+        print(f"Epoch {iter + 1:2} - Training completed in {time_since(start_time)}.")
 
         ##### RNN Validation #####
         # Evaluate the model's results using validation dataset
         acc = 0
         np.random.shuffle(val_indices)
-        for i in val_indices:
-            x = val_samples[i:i + batch_size]
-            t = val_targets[i:i + batch_size]
+        for v in val_indices:
+            x = val_samples[v:v + batch_size]
+            t = val_targets[v:v + batch_size]
             
             # Bringing all samples to max_sentence_len
             normalize_sample(x, max_sentence_len)
@@ -177,8 +175,7 @@ def main():
             acc += torch.argmax(output, 1) == torch.argmax(t, 1)
         total = acc.sum()
         all_perf.append(total / len(val_samples))
-        print(
-            f"Accuracy: {total / len(val_samples):.6f} ({total} / {len(val_samples)})")
+        print(f"Accuracy: {total / len(val_samples):.6f} ({total} / {len(val_samples)})")
 
     ##### RNN Testing #####
     # Evaluate the model's results using test dataset, plots and confusion matrix
@@ -187,7 +184,6 @@ def main():
     confusion_matrix = []
     for i in range(len(labels_vocab)):
         confusion_matrix.append([0 for _ in range(len(labels_vocab))])
-
 
     for t in test_indices:
         x = test_samples[t:t + batch_size]
