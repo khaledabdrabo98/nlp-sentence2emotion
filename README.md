@@ -7,8 +7,9 @@ python3 main.py
 
 ## Dépendances
 - Python3
-- PyTorch : `pip3 install pytorch`
+- PyTorch : `pip3 install pytorch` 
 - TorchText : `pip3 install torchtext` 
+- Seaborn : `pip3 install seaborn` 
 
 ## Travail de 
 - Jean BRIGNONE p1709655

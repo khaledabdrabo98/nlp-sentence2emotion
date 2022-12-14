@@ -1,182 +1,185 @@
 import time
-import math
-import string
-from typing import Union, Iterable
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader
-
-from torchtext.data.utils import get_tokenizer
 from torchtext.vocab import build_vocab_from_iterator
 
 from RNN import RNN
-from CustomDataset import CustomTextDataset, EMOTIONS
-
-tokenizer = get_tokenizer("basic_english")
-
-
-def timeSince(since):
-    now = time.time()
-    s = now - since
-    m = math.floor(s / 60)
-    s -= m * 60
-    return '%dm %ds' % (m, s)
-
-
-def load_file(filename):
-    with open(filename, 'r') as file:
-        str_f = file.read()
-        lines = str_f.split('\n')
-
-    list_sentences = list([])
-    list_emotions = list([])
-
-    for line in lines:
-        # Ignore empty lines
-        if line.strip() == "":
-            break
-        
-        sentence, emotion = line.split(';')
-        list_sentences.append(sentence)
-        list_emotions.append(emotion)
-
-    return list_sentences, list_emotions
-
-def tokenize_dataset(sentences):
-    for text in sentences:
-        yield tokenizer(text)
-
-def build_vocab(sentences_dataset):
-    vocab = build_vocab_from_iterator(tokenize_dataset(sentences_dataset), min_freq=1, specials=["<UNK>"])
-    vocab.set_default_index(vocab["<UNK>"])
-    return vocab
-
-def emotion_from_output(output):
-    top_n, top_i = output.topk(1)
-    emotion_i = top_i[0].item()
-    return EMOTIONS[emotion_i], emotion_i
+from CustomDataset import CustomTextDataset
+from utils import time_since, load_files, plot_confusion_matrix, plot_perf
 
 
 def main():
     batch_size = 10  # amount of data treated each time
-    n_epochs = 10000  # number of time the dataset will be read
-    # learning_rate = 0.005 (already defined in RNN class)
+    n_epochs = 20  # number of time the dataset will be read
+    max_sentence_len = 5
+    learning_rate = 0.005
+    n_embedding = 256
+    n_hidden = 128
+
+    # DEBUG
+    print_every = 5000
+    plot_every = 1000
+
+    stopwords = ['i', 'a', 'im', 'am', 'me', 'my', 'he', 'him', 'she', 'her', 'it',
+                 'us', 're', 'own', 'isn', 'isnt', 'is', 'are',  'do', 'be', 'go', 'yet'
+                 'in', 'the', 'to', 'so', 'if', 'and', 'dr', 'for', 'by', 'its', 'but',
+                 'm', 'this', 'up', 'yes', 'up', 'all', 'at', 'that', 'out', 'or', 'too',
+                 'on', 'ive', 'of', 'as', 'bit',   'jo', 't', 'don', 's', 'oh', 'an', 'q', 
+                 'we', 'they', 'dh', 'n', 'ok', 'okay' 'la']
 
     train_filepath = "dataset/train.txt"  # 16000 sentences
     val_filepath = "dataset/val.txt"     # 2000 sentences
     test_filepath = "dataset/test.txt"   # 2000 sentences
+    files = [train_filepath, val_filepath, test_filepath]
 
-    val_sentences, val_emotions = load_file(val_filepath)
-    train_sentences, train_emotions = load_file(train_filepath)
-    test_sentences, test_emotions = load_file(test_filepath)
+    samples, targets, vocabulary, labels = load_files(files, stopwords)
+    train_samples = samples[0]
+    train_targets = targets[0]
+    val_samples = samples[1]
+    val_targets = targets[1]
+    test_samples = samples[2]
+    test_targets = targets[2]
 
-    vocab = build_vocab(train_sentences)
-    print("len", len(vocab))
+    vocab = build_vocab_from_iterator(vocabulary, specials=["<UNK>"])
+    vocab.set_default_index(vocab["<UNK>"])
+    # print("len", len(vocab))
 
-    # max_tokens = 0
-    # avg_tokens = 0
-    # for sentence in train_sentences:
-    #     tokens = tokenizer(sentence)
-    #     t_size = len(tokens)
-    #     avg_tokens += t_size
-    #     if t_size > max_tokens:
-    #         max_tokens = len(tokens)
+    # Build emotions vocabulary and get total number of emotions
+    labels_vocab = build_vocab_from_iterator(labels)
+    n_emotions = len(labels_vocab)
 
-    # print(max_tokens) 
-    # print(avg_tokens/len(train_sentences))
-    # # Output : Max : 66
-    # #          Avg : 19.166
+    # Load data
+    train_dataset = CustomTextDataset(
+        train_samples, train_targets, vocab, labels_vocab, max_sentence_len, onehot=True)
+    val_dataset = CustomTextDataset(
+        val_samples, val_targets, vocab, labels_vocab, max_sentence_len, onehot=True)
+    test_dataset = CustomTextDataset(
+        test_samples, test_targets, vocab, labels_vocab, max_sentence_len, onehot=False)
 
-    # tokens_w_stopwords = tokenizer("Hello how are you?, Welcome to CoderzColumn!!")
-    # tokens_without_stopwords = tokenizer("Hello how are you Welcome to CoderzColumn")
-    # indexes = vocab(tokens_w_stopwords)
+    train_loader = DataLoader(
+        train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
-    # print(tokens_w_stopwords, indexes)
-    # print(vocab["<UNK>"])
-
-    # Get total number of emotions
-    # unique_emotions = list(set(train_emotions))
-    # n_emotions = len(unique_emotions)
-    n_emotions = len(EMOTIONS)
-
-    train_dataset = CustomTextDataset(vocab, train_sentences, train_emotions)
-    # val_dataset = CustomTextDataset(vocab, val_sentences, val_emotions)
-    # test_dataset = CustomTextDataset(vocab, test_sentences, test_emotions)
-
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    # val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False)
-    # test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
-
+    # DEBUG Dataset
     # print(len(train_dataset))
     # for X, Y in train_loader:
     #     print(X.shape, Y.shape)
     #     break
-    
+
     # train_dataset.__getitem__(2)
 
-    # TODO : Load data
-    # Il est plus efficace de traiter par batch
-    # préparer vos données globales (tensor(sentence_length, batch_size, vocabulary_size)),
-    # pour alimenter votre réseau mot par mot (tensor(batch_size, vocabulary_size)),
-    # utilisez si vous le souhaitez DataLoader de torch.utils.data
-
-    ##### Training RNN #####
-
-    # TODO : Train RNN
-    n_embedding = 128
-    n_hidden = 128
-    rnn = RNN(len(vocab), n_embedding, n_hidden, n_emotions, batch_size)
-
+    ##### RNN Training #####
+    rnn = RNN(len(vocab), n_embedding, n_hidden,
+              n_emotions, batch_size, learning_rate)
+    optim = torch.optim.SGD(rnn.parameters(), lr=learning_rate)
+    criterion = nn.MSELoss(reduction="sum")
     print(rnn)
-
-    print_every = 5000
-    plot_every = 1000
 
     # Keep track of losses for plotting
     current_loss = 0
     all_losses = []
+    all_perf = []
+    acc = 0
 
-    start = time.time()
-
-    for iter in range(1, n_epochs + 1):
+    for iter in range(n_epochs):
+        start_time = time.time()
         for x, t in train_loader:
-            print("onehot", x.shape)
-            print("emo", t)
+            # Transpose sentence tensor to change dimension order
+            # from : tensor(batch_size, sentence_length, vocabulary_size)
+            # to : tensor(sentence_length, batch_size, vocabulary_size)
+            x = torch.transpose(x, 0, 1)
+            # Create a zeroed initial hidden state
+            hidden = rnn.init_hidden()
 
-            output, loss = rnn.train(x, t)
+            # Feed the rnn the batch (word by word)
+            for w in x:
+                output, hidden = rnn(w.type(torch.FloatTensor), hidden)
+
+            acc += torch.argmax(output, 1) == torch.argmax(t, 1)
+
+            # Back-propagate
+            loss = criterion(t.type(torch.FloatTensor), output)
+            loss.backward()
+
             current_loss += loss
 
+            optim.step()
+            optim.zero_grad()
+
+            # Add parameters' gradients to their values, multiplied by learning rate
+            for p in rnn.parameters():
+                p.data.add_(p.grad.data, alpha=-learning_rate)
+
             # Print iter number, loss, name and guess
-            if iter % print_every == 0:
-                guess, guess_i = emotion_from_output(output)
-                correct = '✓' if guess == t else '✗ (%s)' % t
-                print('%d %d%% (%s) %.4f %s / %s %s' % (iter, iter / n_epochs *
-                    100, timeSince(start), loss, x, guess, correct))
+            # if iter % print_every == 0:
+            #     guess, guess_i = emotion_from_output(output)
+            #     correct = '✓' if guess == t else '✗ (%s)' % t
+            #     print('%d %d%% (%s) %.4f %s / %s %s' % (iter, iter / n_epochs *
+            #         100, timeSince(start), loss, x, guess, correct))
 
-            # Add current loss avg to list of losses
-            if iter % plot_every == 0:
-                all_losses.append(current_loss / plot_every)
-                current_loss = 0
+            # # Add current loss avg to list of losses
+            # if iter % plot_every == 0:
+            #     all_losses.append(current_loss / plot_every)
+            #     current_loss = 0
 
-            # # TODO : Plot the results
-            plt.figure()
-            plt.plot(all_losses)
+            # # # TODO : Plot the results
+            # plt.figure()
+            # plt.plot(all_losses)
+        print(
+            f"Epoch {iter + 1:2} - Training completed in {time_since(start_time)}.")
 
-        # TODO : Evaluate the results
-        # for x, t in test_loader:
-        # acc = 0.
-		# # on lit toutes les donnéees de test
-		# for x,t in test_loader:
-		# 	# on calcule la sortie du modèle
-		# 	y = rnn(x)
-		# 	# on regarde si la sortie est correcte
-		# 	acc += torch.argmax(y,1) == torch.argmax(t,1)
-		# # on affiche le pourcentage de bonnes réponses
-		# print(acc/data_test.shape[0] * 100)
+        ##### RNN Validation #####
+        # Evaluate the model's results using validation dataset
+        acc = 0
+        for x, t in val_loader:
+            # Transpose sentence tensor to change dimension order
+            # from : tensor(batch_size, sentence_length, vocabulary_size)
+            # to : tensor(sentence_length, batch_size, vocabulary_size)
+            x = torch.transpose(x, 0, 1)
+            # Create a zeroed initial hidden state
+            hidden = rnn.init_hidden()
 
-        
-        # TODO : Invent new feature (run rnn on user input?)
+            # Feed the rnn the batch (word by word)
+            for w in x:
+                output, hidden = rnn(w.type(torch.FloatTensor), hidden)
+
+            acc += torch.argmax(output, 1) == torch.argmax(t, 1)
+        total = acc.sum()
+        all_perf.append(total / len(val_samples))
+        print(
+            f"Accuracy: {total / len(val_samples):.6f} ({total} / {len(val_samples)})")
+
+    ##### RNN Testing #####
+    # Evaluate the model's results using test dataset, plots and confusion matrix
+
+    # Initiaisation of the confusion matrix
+    confusion_matrix = []
+    for i in range(len(labels_vocab)):
+        confusion_matrix.append([0 for _ in range(len(labels_vocab))])
+
+    for x, t in test_loader:
+        t = t[0].tolist()
+        # Transpose sentence tensor to change dimension order
+        # from : tensor(batch_size, sentence_length, vocabulary_size)
+        # to : tensor(sentence_length, batch_size, vocabulary_size)
+        x = torch.transpose(x, 0, 1)
+        # Create a zeroed initial hidden state
+        hidden = rnn.init_hidden()
+
+        # Feed the rnn the batch (word by word)
+        for w in x:
+            output, hidden = rnn(w.type(torch.FloatTensor), hidden)
+
+        # Record the predicted results in the confusion matrix
+        output = torch.argmax(output, dim=1).tolist()
+
+        for i in range(len(t)):
+            confusion_matrix[t[i]][output[i]] += 1
+
+    plot_confusion_matrix(confusion_matrix)
+    plot_perf(all_perf)
 
 
 if __name__ == "__main__":

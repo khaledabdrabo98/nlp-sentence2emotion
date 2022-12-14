@@ -1,53 +1,41 @@
-import string
 import torch
 from torch.utils.data import TensorDataset
 from torch.nn.functional import one_hot
-from torchtext.data.utils import get_tokenizer
-
-from utils import MAX_WORDS_PER_TRAINING, EMOTIONS
-
-
-# Define tokenizer
-tokenizer = get_tokenizer("basic_english")
 
 
 class CustomTextDataset(TensorDataset):
-    def __init__(self, vocab, sentences, emotions):
-        self.max_len = MAX_WORDS_PER_TRAINING # the maximum length for each sequence 
+    def __init__(self, samples, targets, vocab, labels_voc, max_sentence_length, onehot):
+        self.max_len = max_sentence_length  # the maximum length for each sequence
         self.vocab = vocab
-        self.sentences = sentences
-        self.emotions = emotions
-        self.unique_emotions = list(set(emotions))
+        self.labels_vocab = labels_voc
+        self.samples = samples
+        self.targets = targets
+        self.enable_onehot = onehot
 
     def __len__(self):
-        return len(self.vocab)
+        return len(self.samples)
 
     def __getitem__(self, idx):
-        sentence = self.sentences[idx]
-        emotion = self.emotions[idx]
+        sample = self.samples[idx]
+        target = self.targets[idx]
         
-        emotion_tensor = []
-        for i in range(len(EMOTIONS)):
-            if i == EMOTIONS.index(emotion):
-                emotion_tensor.append(1)
-            else:
-                emotion_tensor.append(0)
+        # list of indexes
+        indexes = self.vocab(sample)
+        t = self.labels_vocab(target)
 
-        emotion_tensor = torch.tensor(emotion_tensor) 
-
-        print(sentence)
-        print(emotion)
-        # Token with stop words included
-        tokens = tokenizer(sentence)
-        # TODO : test tokens without stopwords 
-        indexes = self.vocab(tokens) # list of indexes
-        
         # Bringing all samples to max_len
         if len(indexes) < self.max_len:
-            same_size_sample = indexes + ([0]* (self.max_len-len(indexes)))
+            same_size_sample = indexes + ([0] * (self.max_len-len(indexes)))
         else:
             same_size_sample = indexes[:self.max_len]
-        
-        onehot = one_hot(torch.tensor(same_size_sample), num_classes=len(self.vocab))
 
-        return onehot, emotion_tensor
+        x_batch = one_hot(torch.LongTensor(same_size_sample),
+                    num_classes=len(self.vocab))
+        
+        if self.enable_onehot:
+            t = one_hot(torch.tensor(t), num_classes=len(self.labels_vocab))
+            t = torch.squeeze(t)
+        
+        # print(x_batch.shape)
+        # print(t.shape)
+        return x_batch, t
